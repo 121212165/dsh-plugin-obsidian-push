@@ -1,0 +1,9 @@
+# Mounts obsidian-push into a dsh profile. vaultDir is required.
+- insert:
+    - id: obsidian-push
+      name: dsh-plugin-obsidian-push
+      config:
+        enabled: true
+        vaultDir: ""            # 必填：Obsidian 库根目录，如 ~/obsidian/MyVault
+        subfolder: dsh-sessions # 库内子目录
+        tags: [dsh, session]

@@ -1,0 +1,68 @@
+{
+  "name": "dsh-plugin-obsidian-push",
+  "version": "0.1.0",
+  "description": "dsh plugin: push archived session transcripts into an Obsidian vault as Markdown notes with YAML frontmatter; dedupes by content hash.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./render": {
+      "types": "./lib/types/transcript/render.d.ts",
+      "default": "./lib/transcript/render.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "obsidian",
+    "markdown",
+    "transcript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/121212165/dsh-plugin-obsidian-push.git"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/121212165/dsh-plugin-obsidian-push/issues"
+  }
+}
