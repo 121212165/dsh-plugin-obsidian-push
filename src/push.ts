@@ -35,9 +35,15 @@ export function frontmatter(options: PushOptions, sessionId: string, firstAt: st
   return lines.join('\n');
 }
 
-/** Sortable, collision-free: day + short session id. */
+/** Sortable, collision-free: day + short session id. The harness prefixes
+ * every id with 'session-', which would collide in the first 8 chars — strip it
+ * and shorten the uuid part instead. */
+export function shortSessionId(sessionId: string): string {
+  return sessionId.replace(/^session-/, '').slice(0, 8);
+}
+
 export function noteFilename(sessionId: string, firstAt: string): string {
-  return `${firstAt.slice(0, 10)}-${sessionId.slice(0, 8)}.md`;
+  return `${firstAt.slice(0, 10)}-${shortSessionId(sessionId)}.md`;
 }
 
 export function planNote(records: PushRecordLike[], options: PushOptions): PlannedNote | null {

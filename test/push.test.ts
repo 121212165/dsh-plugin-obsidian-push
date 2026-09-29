@@ -40,4 +40,6 @@ test('dedupe: identical content skips, changed content overwrites', () => {
 
 test('filename is day + short session id', () => {
   assert.equal(noteFilename('abcdef1234567890', '2026-09-28T01:00:00.000Z'), '2026-09-28-abcdef12.md');
+  // the harness 'session-' prefix must not eat the whole short id
+  assert.equal(noteFilename('session-97098b89-70b4', '2026-09-29T01:00:00.000Z'), '2026-09-29-97098b89.md');
 });
