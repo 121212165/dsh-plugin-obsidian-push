@@ -1,5 +1,7 @@
 # dsh-plugin-obsidian-push
 
+**EN** · Pushes archived transcripts (from dsh-plugin-transcript) into an Obsidian vault as Markdown with YAML frontmatter, filename `YYYY-MM-DD-<short session id>.md`, deduped by content hash so a re-run skips what has not changed (`/obsidian-push`). · 5 `node --test` green (incl. YAML quote escaping) · load path shared with sibling plugins that were mounted; this plugin itself not live-mounted.
+
 DeepSeek Harness (dsh) 插件：把归档的会话转录推送成 Obsidian 笔记——YAML frontmatter（title/date/session/tags，Obsidian 属性面板直接可读）、正文按时间排序渲染用户/助手/工具行，按内容哈希幂等去重。数据源是 [dsh-plugin-transcript](https://github.com/121212165/dsh-plugin-transcript) 的 JSONL 边车（同 schema 同默认目录，契约互通）。
 
 同系列：[cost-ledger](https://github.com/121212165/dsh-plugin-cost-ledger) · [session-insights](https://github.com/121212165/dsh-plugin-session-insights) · [transcript-search](https://github.com/121212165/dsh-plugin-transcript-search) · [relay-quota](https://github.com/121212165/dsh-plugin-relay-quota)。
@@ -26,8 +28,21 @@ DeepSeek Harness (dsh) 插件：把归档的会话转录推送成 Obsidian 笔�
 
 ## 安装
 
-克隆或 npm 安装到 profile 的 node_modules；从源码安装需要先构建：`npm install` 经 `prepare` 自动产出 `lib/`。
+三步，实测于 `@deepseek-ai/dsh@0.1.7-alpha.1`（需 `pnpm` 在 PATH 上）：
 
+```sh
+# ① 装进 profile：dsh plugin 把参数原样转发给 pnpm，git 包会自动跑 prepare 构建 lib/
+dsh plugin --profile web add github:121212165/dsh-plugin-obsidian-push
+```
+
+② 把本仓库根目录 `cordis.patch.yml` 的内容**并进** `$DSH_HOME/profiles/web/cordis.patch.yml`。
+该文件默认是 `[]`，所以要么整份替换，要么把 insert 条目并进同一个数组；**不要直接追加**——
+追加会形成两个 YAML 文档，启动即报
+`failed to parse overlay ... end of the stream or a document separator is expected`（本机实测踩过）。
+
+③ 重启 dsh。配置层与 client 半都要重启才生效（客户端按 boot 时算出的内容 rev 下发，硬刷新浏览器没用）。
+
+自检挂载：`dsh --profile web --dump-config | grep dsh-plugin-obsidian-push`，应看到该条目。
 ## 验证状态
 
 - frontmatter/文件名/排序/幂等决策为纯函数，5 个 node --test 测试全绿（含 YAML 引号转义）。
