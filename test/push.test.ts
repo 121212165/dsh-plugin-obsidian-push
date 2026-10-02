@@ -15,7 +15,7 @@ test('planned note has frontmatter, sortable filename and ordered body', () => {
   assert.ok(note.content.startsWith('---\ntitle: "写作"\ndate: 2026-09-28'));
   assert.ok(note.content.includes('session: abcdef1234567890'));
   assert.ok(note.content.includes('  - dsh'));
-  assert.ok(note.path.endsWith('/dsh-sessions/2026-09-28-abcdef12.md'));
+  assert.ok(note.path.endsWith('/dsh-sessions/2026-09-28-abcdef123456.md'));
   const body = note.content.split('---\n').pop()!;
   assert.ok(body.indexOf('earlier') < body.indexOf('hello')); // sorted by time
   assert.ok(body.includes('## 🤖 助手 · deepseek-v4-pro'));
@@ -39,7 +39,8 @@ test('dedupe: identical content skips, changed content overwrites', () => {
 });
 
 test('filename is day + short session id', () => {
-  assert.equal(noteFilename('abcdef1234567890', '2026-09-28T01:00:00.000Z'), '2026-09-28-abcdef12.md');
-  // the harness 'session-' prefix must not eat the whole short id
-  assert.equal(noteFilename('session-97098b89-70b4', '2026-09-29T01:00:00.000Z'), '2026-09-29-97098b89.md');
+  assert.equal(noteFilename('abcdef1234567890', '2026-09-28T01:00:00.000Z'), '2026-09-28-abcdef123456.md');
+  // harness ids are 'session-<uuid>'; family convention (html-report, transcript)
+  // is 12 chars after stripping the prefix
+  assert.equal(noteFilename('session-68f7b972-c234-42b4-ba9a-539564cb2940', '2026-09-29T01:00:00.000Z'), '2026-09-29-68f7b972-c23.md');
 });

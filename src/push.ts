@@ -36,10 +36,10 @@ export function frontmatter(options: PushOptions, sessionId: string, firstAt: st
 }
 
 /** Sortable, collision-free: day + short session id. The harness prefixes
- * every id with 'session-', which would collide in the first 8 chars — strip it
- * and shorten the uuid part instead. */
+ * every id with 'session-' — strip it and keep 12 chars of the uuid part,
+ * matching html-report (8 chars of uuid collided same-day). */
 export function shortSessionId(sessionId: string): string {
-  return sessionId.replace(/^session-/, '').slice(0, 8);
+  return sessionId.replace(/^session-/, '').slice(0, 12);
 }
 
 export function noteFilename(sessionId: string, firstAt: string): string {
