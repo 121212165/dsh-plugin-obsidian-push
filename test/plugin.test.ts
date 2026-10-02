@@ -44,12 +44,13 @@ test('disabled by config — or an empty vaultDir — mounts nothing', async () 
   assert.equal(unconfigured.commands.length, 0);
 });
 
-test('apply wires exactly one command: /obsidian-push, with a usage hint', async () => {
+test('apply wires the push command and the chain command, each with a hint', async () => {
   const harness = await mounted();
-  assert.deepEqual(harness.commands.map((command) => command.name), ['obsidian-push']);
+  assert.deepEqual(harness.commands.map((command) => command.name), ['obsidian-push', 'archive']);
   const command = harness.command('obsidian-push');
   assert.match(command.description, /Obsidian/);
-  assert.match(command.input?.hint ?? '', /sessionId\|all/);
+  assert.match(command.input?.hint ?? '', /sessionId/);
+  assert.match(harness.command('archive').description, /检查.*推送.*检索/s, '/archive describes all three steps it walks');
 });
 
 test('with no archived sidecars the push fails loud pointing at the data dir', async () => {

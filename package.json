@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-obsidian-push",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "dsh plugin: push archived session transcripts into an Obsidian vault as Markdown notes with YAML frontmatter; dedupes by content hash.",
   "type": "module",
   "license": "MIT",
