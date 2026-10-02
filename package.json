@@ -15,14 +15,18 @@
       "types": "./lib/types/transcript/render.d.ts",
       "default": "./lib/transcript/render.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*": "./locale/*",
+    "./icon.svg": "./icon.svg"
   },
   "files": [
     "lib",
     "src",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "icon.svg",
+    "locale"
   ],
   "dsh": {
     "bundle": {
@@ -64,5 +68,6 @@
   },
   "bugs": {
     "url": "https://github.com/121212165/dsh-plugin-obsidian-push/issues"
-  }
+  },
+  "icon": "./icon.svg"
 }

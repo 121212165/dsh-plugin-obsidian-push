@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Obsidian 入库",
+    "description": "把会话转录推送进 Obsidian 库，frontmatter 完整、幂等去重"
+  }
+}
