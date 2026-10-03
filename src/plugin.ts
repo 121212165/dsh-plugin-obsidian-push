@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { parseJsonl, type TranscriptLine } from './transcript/line.ts';
 import { planNote, decide, type PushRecordLike } from './push.ts';
 import { archiveVerdict, checkArchive, renderSteps, sessionMatches, shortId, type ArchiveCheck, type StepOutcome } from './archive.ts';
-import { parseVaultRegistry, pickVault } from './vault.ts';
+import { parseVaultRegistry, pickVault, registryPaths } from './vault.ts';
 
 export const name = 'obsidian-push';
 export const inject = ['commands'];
@@ -108,36 +108,42 @@ export function apply(ctx: Context, config: Config): void {
   const log = ctx.logger('obsidian-push');
   if (!config.enabled) return void log.info('disabled by config');
 
-  // zero-config: discover the vault from Obsidian's own registry when unset
-  let vaultDir = config.vaultDir ? expandHome(config.vaultDir) : '';
-  if (!vaultDir) {
-    try {
-      const appData = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
-      const registry = join(appData, 'obsidian', 'obsidian.json');
-      const discovered = pickVault(parseVaultRegistry(readFileSync(registry, 'utf8')));
-      if (discovered) {
-        vaultDir = discovered;
-        log.info(`vaultDir auto-discovered: ${discovered}`);
+  // Zero-config, cross-platform: resolve the vault lazily at each invocation —
+  // Windows/macOS/Linux registry paths, user-set vaultDir wins. Resolving late
+  // means "open Obsidian once" is enough, even after the plugin already loaded.
+  const NO_VAULT_MESSAGE = [
+    '没有找到 Obsidian 库。两步解决：',
+    '1. 打开 Obsidian，随便进入一个库（首次打开会自动注册到系统配置）',
+    '2. 回来重试本命令',
+    '也可以在插件配置里手动填 vaultDir（库的完整路径）。',
+  ].join('\n');
+
+  const resolveVault = (): string => {
+    if (config.vaultDir) return expandHome(config.vaultDir);
+    const candidates = registryPaths().map((registry) => {
+      try {
+        return pickVault(parseVaultRegistry(readFileSync(registry, 'utf8')));
+      } catch {
+        return null;
       }
-    } catch (error) {
-      log.warn(`vault auto-discovery failed: ${String(error)}`);
-    }
-  }
-  if (!vaultDir) return void log.info('vaultDir not configured and no Obsidian vault found — set obsidian-push.vaultDir');
+    });
+    return candidates.find((path): path is string => path !== null && path !== '') ?? '';
+  };
 
   const dataDir = config.dataDir ? expandHome(config.dataDir) : join(homedir(), '.dsh', 'transcripts');
-  const options = { vaultDir, subfolder: config.subfolder, tags: config.tags };
 
   ctx.commands.register({
     name: 'obsidian-push',
     description: '把归档会话转录推送为 Obsidian 笔记：/obsidian-push [sessionId|短id|all]（缺省 all）；整条链一步走完用 /archive',
     input: { hint: '[sessionId|短id|all]' },
     handler: ({ rawInput }) => {
+      const vaultDir = resolveVault();
+      if (!vaultDir) return { kind: 'error', text: NO_VAULT_MESSAGE };
       const records = readAllLines(dataDir);
       if (!records.length) return { kind: 'error', text: `还没有归档转录（${dataDir}）。` };
       const groups = groupBySession(records);
       const argument = String(rawInput ?? '').trim() || 'all';
-      const result = pushSessions(groups, argument, options);
+      const result = pushSessions(groups, argument, { vaultDir, subfolder: config.subfolder, tags: config.tags });
       if (!result.targets) return { kind: 'error', text: `没有匹配 ${argument} 的会话（现有 ${groups.size} 个，短 id 也可以）。` };
       return {
         kind: 'success',
@@ -177,12 +183,16 @@ export function apply(ctx: Context, config: Config): void {
       ];
 
       const argument = String(rawInput ?? '').trim() || 'all';
-      const pushed = pushSessions(groups, argument, options);
+      const vaultDir = resolveVault();
+      if (!vaultDir) return { kind: 'error', text: renderSteps('/archive', [
+        { title: 'Obsidian 推送', mark: 'bad', detail: '没有找到 Obsidian 库', next: '在 Obsidian 里打开一次任意库（自动注册），或在插件配置里填 vaultDir' },
+      ]) };
+      const pushed = pushSessions(groups, argument, { vaultDir, subfolder: config.subfolder, tags: config.tags });
       steps.push(
         pushed.targets === 0
           ? { title: 'Obsidian 推送', mark: 'bad', detail: `没有匹配「${argument}」的会话`, next: '/archive all 推全部，或 /archive <短 id>' }
           : pushed.written === 0
-            ? { title: 'Obsidian 推送', mark: 'ok', detail: `${pushed.targets} 个目标全部命中已有笔记，${pushed.skipped} 篇内容未变跳过`, next: `笔记在库里的 ${options.subfolder}/ 下` }
+            ? { title: 'Obsidian 推送', mark: 'ok', detail: `${pushed.targets} 个目标全部命中已有笔记，${pushed.skipped} 篇内容未变跳过`, next: `笔记在库里的 ${config.subfolder}/ 下` }
             : {
                 title: 'Obsidian 推送',
                 mark: 'ok',
@@ -202,5 +212,5 @@ export function apply(ctx: Context, config: Config): void {
     },
   });
 
-  log.info(`mounted · vault=${vaultDir}/${config.subfolder}`);
+  log.info(`mounted · vault=resolve-at-invocation · subfolder=${config.subfolder}`);
 }

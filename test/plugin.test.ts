@@ -39,13 +39,17 @@ test('disabled by config — or no discoverable vault — mounts nothing', async
   await off.apply({ enabled: false });
   assert.equal(off.commands.length, 0);
 
-  // apply() intentionally no-ops (log only) instead of throwing on a missing vault
+  // with no discoverable vault, commands still register — invoking them
+  // returns the actionable two-step fix instead of a silent no-op
   const savedAppData = process.env.APPDATA;
   process.env.APPDATA = join(mkdtempSync(join(tmpdir(), 'obsidian-empty-')));
   try {
     const unconfigured = makeHarness();
     await unconfigured.apply({ vaultDir: '' });
-    assert.equal(unconfigured.commands.length, 0); // no obsidian.json in the fake APPDATA
+    assert.equal(unconfigured.commands.length, 2);
+    const result = unconfigured.command('obsidian-push').handler({ rawInput: 'all' });
+    assert.equal(result.kind, 'error');
+    assert.ok(result.text.includes('打开 Obsidian'), result.text);
   } finally {
     process.env.APPDATA = savedAppData;
   }

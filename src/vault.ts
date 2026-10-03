@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 /** Zero-config vault discovery: read Obsidian's own registry
  * (%APPDATA%/obsidian/obsidian.json) and pick the vault the user actually
  * uses — the one currently open, else the most recently opened. Plugins must
@@ -33,4 +34,18 @@ export function parseVaultRegistry(content: string): VaultCandidate[] {
   } catch {
     return [];
   }
+}
+
+/** Every known obsidian.json location across platforms, in try order:
+ * Windows (APPDATA), macOS (Library/Application Support), Linux (~/.config). */
+export function registryPaths(env: { APPDATA?: string; HOME?: string } = process.env): string[] {
+  const home = env.HOME ?? '';
+  const paths: string[] = [];
+  if (env.APPDATA) paths.push(join(env.APPDATA, 'obsidian', 'obsidian.json'));
+  if (home) {
+    paths.push(join(home, 'Library', 'Application Support', 'obsidian', 'obsidian.json'));
+    paths.push(join(home, '.config', 'obsidian', 'obsidian.json'));
+    if (!env.APPDATA) paths.push(join(home, 'AppData', 'Roaming', 'obsidian', 'obsidian.json'));
+  }
+  return paths;
 }
