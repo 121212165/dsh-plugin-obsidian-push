@@ -7,8 +7,9 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { fire, fireOk, makeHarness, mounted, writeTranscript } from './harness.ts';
 
@@ -33,17 +34,46 @@ function notePath(harness: ReturnType<typeof makeHarness>, filename: string): st
   return join(harness.vaultDir, 'dsh-sessions', filename);
 }
 
-test('disabled by config — or an empty vaultDir — mounts nothing', async () => {
+test('disabled by config — or no discoverable vault — mounts nothing', async () => {
   const off = makeHarness();
   await off.apply({ enabled: false });
   assert.equal(off.commands.length, 0);
 
   // apply() intentionally no-ops (log only) instead of throwing on a missing vault
-  const unconfigured = makeHarness();
-  await unconfigured.apply({ vaultDir: '' });
-  assert.equal(unconfigured.commands.length, 0);
+  const savedAppData = process.env.APPDATA;
+  process.env.APPDATA = join(mkdtempSync(join(tmpdir(), 'obsidian-empty-')));
+  try {
+    const unconfigured = makeHarness();
+    await unconfigured.apply({ vaultDir: '' });
+    assert.equal(unconfigured.commands.length, 0); // no obsidian.json in the fake APPDATA
+  } finally {
+    process.env.APPDATA = savedAppData;
+  }
 });
 
+test("zero-config: empty vaultDir auto-discovers the vault from Obsidian's registry", async () => {
+  const fake = mkdtempSync(join(tmpdir(), 'obsidian-fixture-'));
+  const vaultRoot = join(fake, 'My Vault');
+  mkdirSync(join(fake, 'obsidian'), { recursive: true });
+  writeFileSync(join(fake, 'obsidian', 'obsidian.json'), JSON.stringify({ vaults: { a: { path: vaultRoot, open: true, ts: 1 } } }));
+  mkdirSync(vaultRoot, { recursive: true });
+  const savedAppData = process.env.APPDATA;
+  process.env.APPDATA = fake;
+  try {
+    const harness = makeHarness();
+    await harness.apply({ vaultDir: '' });
+    assert.equal(harness.commands.length, 2); // push + /archive, mounted without any hand-typed path
+    writeTranscript(harness, '2026-09', [
+      { sessionId: 'session-zeroconf01', at: '2026-09-28T01:00:00.000Z', kind: 'user', text: '零配置冒烟' },
+      { sessionId: 'session-zeroconf01', at: '2026-09-28T01:05:00.000Z', kind: 'assistant', who: 'deepseek-v4-pro', text: '完成' },
+    ]);
+    const result = harness.command('obsidian-push').handler({ rawInput: 'all' });
+    assert.equal(result.kind, 'success', result.text);
+    assert.ok(existsSync(join(vaultRoot, 'dsh-sessions')), 'note landed in the discovered vault');
+  } finally {
+    process.env.APPDATA = savedAppData;
+  }
+});
 test('apply wires the push command and the chain command, each with a hint', async () => {
   const harness = await mounted();
   assert.deepEqual(harness.commands.map((command) => command.name), ['obsidian-push', 'archive']);

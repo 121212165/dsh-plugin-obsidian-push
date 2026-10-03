@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { parseJsonl, type TranscriptLine } from './transcript/line.ts';
 import { planNote, decide, type PushRecordLike } from './push.ts';
 import { archiveVerdict, checkArchive, renderSteps, sessionMatches, shortId, type ArchiveCheck, type StepOutcome } from './archive.ts';
+import { parseVaultRegistry, pickVault } from './vault.ts';
 
 export const name = 'obsidian-push';
 export const inject = ['commands'];
@@ -106,10 +107,25 @@ function flushedMarkdown(dataDir: string): Set<string> {
 export function apply(ctx: Context, config: Config): void {
   const log = ctx.logger('obsidian-push');
   if (!config.enabled) return void log.info('disabled by config');
-  if (!config.vaultDir) return void log.info('vaultDir not configured — set obsidian-push.vaultDir');
+
+  // zero-config: discover the vault from Obsidian's own registry when unset
+  let vaultDir = config.vaultDir ? expandHome(config.vaultDir) : '';
+  if (!vaultDir) {
+    try {
+      const appData = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming');
+      const registry = join(appData, 'obsidian', 'obsidian.json');
+      const discovered = pickVault(parseVaultRegistry(readFileSync(registry, 'utf8')));
+      if (discovered) {
+        vaultDir = discovered;
+        log.info(`vaultDir auto-discovered: ${discovered}`);
+      }
+    } catch (error) {
+      log.warn(`vault auto-discovery failed: ${String(error)}`);
+    }
+  }
+  if (!vaultDir) return void log.info('vaultDir not configured and no Obsidian vault found — set obsidian-push.vaultDir');
 
   const dataDir = config.dataDir ? expandHome(config.dataDir) : join(homedir(), '.dsh', 'transcripts');
-  const vaultDir = expandHome(config.vaultDir);
   const options = { vaultDir, subfolder: config.subfolder, tags: config.tags };
 
   ctx.commands.register({
