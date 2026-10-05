@@ -11,6 +11,8 @@
  *     instead of pretending to do a step that does not exist.
  */
 
+import { noteFilename, type PushRecordLike } from './push.ts';
+
 export function shortId(sessionId: string, width = 12): string {
   return sessionId.replace(/^session-/, '').slice(0, width);
 }
@@ -67,4 +69,46 @@ export function archiveVerdict(check: ArchiveCheck, written: number, skipped: nu
   if (check.missing.length) return `有 ${check.missing.length}${check.truncated ? '+' : ''} 个会话没落 markdown——去补，别急着推送。`;
   if (written) return `本轮新推 ${written} 篇笔记${skipped ? `（${skipped} 篇内容未变，跳过）` : ''}，链是通的。`;
   return '推送面干净：所有笔记都已与转录一致。';
+}
+
+/** The session's display title for the MOC: first user message, whitespace
+ * collapsed, capped at 40 chars — the same cap deriveTitle uses upstream. */
+export function sessionTitle(lines: PushRecordLike[], max = 40): string {
+  const sorted = [...lines].sort((a, b) => (a.at < b.at ? -1 : 1));
+  const firstUser = sorted.find((line) => line.kind === 'user' && line.text.trim());
+  const text = (firstUser?.text ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return '（无标题）';
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+}
+
+export interface IndexRow {
+  date: string;
+  title: string;
+  short: string;
+  file: string;
+}
+
+/** One row per session for the MOC, newest first. The file name must come from
+ * push.ts's own noteFilename — a hand-rolled copy here is how the index starts
+ * pointing at notes that were never written. */
+export function indexRows(groups: Map<string, PushRecordLike[]>): IndexRow[] {
+  return [...groups.entries()]
+    .map(([sessionId, lines]) => {
+      const sorted = [...lines].sort((a, b) => (a.at < b.at ? -1 : 1));
+      const firstAt = sorted[0]?.at ?? '';
+      return {
+        date: firstAt.slice(0, 10),
+        title: sessionTitle(sorted),
+        short: shortId(sessionId),
+        file: noteFilename(sessionId, firstAt),
+      };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.short < b.short ? 1 : -1));
+}
+
+/** The MOC body written to `<vault>/<subfolder>/Index.md` after a push. */
+export function buildIndex(groups: Map<string, PushRecordLike[]>, subfolder: string): string {
+  const rows = indexRows(groups);
+  const lines = rows.map((row) => `- ${row.date} · [[${subfolder}/${row.file.replace(/\.md$/, '')}|${row.title}]] · ${row.short}`);
+  return [`# 会话索引（MOC）`, '', `${rows.length} 个会话，/archive 自动生成，勿手改。`, '', ...lines, ''].join('\n');
 }

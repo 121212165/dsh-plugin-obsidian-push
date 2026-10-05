@@ -7,13 +7,13 @@
 import type { Context } from '@deepseek-ai/cordis';
 import Schema from '@deepseek-ai/schemastery';
 import type {} from '@deepseek-ai/dsh-commands';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { parseJsonl, type TranscriptLine } from './transcript/line.ts';
 import { planNote, decide, type PushRecordLike } from './push.ts';
-import { archiveVerdict, checkArchive, renderSteps, sessionMatches, shortId, type ArchiveCheck, type StepOutcome } from './archive.ts';
+import { archiveVerdict, buildIndex, checkArchive, renderSteps, sessionMatches, shortId, type ArchiveCheck, type StepOutcome } from './archive.ts';
 import { parseVaultRegistry, pickVault, registryPaths } from './vault.ts';
 
 export const name = 'obsidian-push';
@@ -104,6 +104,14 @@ function flushedMarkdown(dataDir: string): Set<string> {
   }
 }
 
+/** temp+rename atomic write — the family rule for anything others may read. */
+function writeAtomic(dest: string, content: string): void {
+  mkdirSync(dirname(dest), { recursive: true });
+  const tmp = `${dest}.${process.pid}.tmp`;
+  writeFileSync(tmp, content, 'utf8');
+  renameSync(tmp, dest);
+}
+
 export function apply(ctx: Context, config: Config): void {
   const log = ctx.logger('obsidian-push');
   if (!config.enabled) return void log.info('disabled by config');
@@ -154,7 +162,7 @@ export function apply(ctx: Context, config: Config): void {
 
   ctx.commands.register({
     name: 'archive',
-    description: '归档链三步一次走完：① 检查 transcript 有没有会话没落 markdown ② 推送到 Obsidian ③ 报告可检索面（transcript-search）',
+    description: '归档链四步一次走完：① 检查 transcript 有没有会话没落 markdown ② 推送到 Obsidian ③ 报告可检索面（transcript-search）④ 刷新会话索引 Index.md（MOC）',
     input: { hint: '[sessionId|短id|all]' },
     handler: ({ rawInput }) => {
       const records = readAllLines(dataDir);
@@ -207,6 +215,19 @@ export function apply(ctx: Context, config: Config): void {
         detail: `${check.lines} 行可检索。它每次查询都从 transcript-YYYY-MM.jsonl 重建索引，磁盘上没有索引文件可"刷新"，所以也不存在陈旧索引`,
         next: '随时 /find <关键词>（注意它的短 id 取 8 位，本插件的 markdown 文件名取 12 位）',
       });
+
+      // ④ the MOC: one line per session, rebuilt from the same groups we just pushed
+      if (pushed.targets > 0) {
+        try {
+          const indexPath = join(vaultDir, config.subfolder, 'Index.md');
+          writeAtomic(indexPath, buildIndex(groups, config.subfolder));
+          steps.push({ title: '会话索引（Index.md）', mark: 'ok', detail: `${groups.size} 个会话已索引 → ${indexPath}`, next: '在 Obsidian 里把 Index.md 固定或建 Dataview 面板都行' });
+        } catch (error) {
+          steps.push({ title: '会话索引（Index.md）', mark: 'bad', detail: `索引写不进去：${String(error)}`, next: '检查库目录是否只读，或路径是否被同步盘锁住' });
+        }
+      } else {
+        steps.push({ title: '会话索引（Index.md）', mark: 'bad', detail: '本轮没有推送任何会话，索引未刷新', next: '先解决推送步骤，再重跑 /archive' });
+      }
 
       return { kind: 'success', text: `${renderSteps('/archive', steps)}\n\n判定：${archiveVerdict(check, pushed.written, pushed.skipped)}` };
     },

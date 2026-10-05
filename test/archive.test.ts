@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { archiveVerdict, checkArchive, renderSteps, sessionMatches, shortId } from '../src/archive.ts';
+import { archiveVerdict, buildIndex, checkArchive, renderSteps, sessionMatches, shortId } from '../src/archive.ts';
+import type { PushRecordLike } from '../src/push.ts';
 import { makeHarness, mounted, writeTranscript, type Harness } from './harness.ts';
 
 const SESSION = 'session-0f3e9c1a-1234-4abc-9def-000000000001';
@@ -133,4 +134,37 @@ test('/obsidian-push accepts a short id now (it used to match nothing)', async (
   const missed = harness.command('obsidian-push').handler({ rawInput: 'deadbeef' });
   assert.equal(missed.kind, 'error');
   assert.ok(missed.text.includes('短 id 也可以'), missed.text);
+});
+
+test('buildIndex renders one newest-first row per session with a vault link', () => {
+  const asRecord = (value: Record<string, unknown>): PushRecordLike => value as unknown as PushRecordLike;
+  const groups = new Map<string, PushRecordLike[]>([
+    ['session-aaaaaaaaaaaa0001', [asRecord(line('session-aaaaaaaaaaaa0001', 'user', '  给  图片  加取色   功能 ')), asRecord(line('session-aaaaaaaaaaaa0001', 'assistant', '答复'))]],
+    ['session-bbbbbbbbbbbb0002', [asRecord(line('session-bbbbbbbbbbbb0002', 'assistant', '只有助手发言')), asRecord(line('session-bbbbbbbbbbbb0002', 'user', ' later user line'))]],
+  ]);
+  const index = buildIndex(groups, 'dsh-sessions');
+  assert.ok(index.startsWith('# 会话索引（MOC）'), index);
+  assert.ok(index.includes('2 个会话'), index);
+  const rows = index.split('\n').filter((row) => row.startsWith('- '));
+  assert.equal(rows.length, 2);
+  assert.ok(rows[0]!.includes(shortId('session-bbbbbbbbbbbb0002')), 'newest session first, got: ' + rows[0]);
+  assert.ok(index.includes('[[dsh-sessions/2026-10-02-' + shortId('session-aaaaaaaaaaaa0001') + '|给 图片 加取色 功能]]'), index);
+  // a title that never had a user line says so instead of going empty
+  const empty = buildIndex(new Map([['session-cccccccccccc0003', [asRecord(line('session-cccccccccccc0003', 'system', 'boot'))]]]), 'dsh-sessions');
+  assert.ok(empty.includes('（无标题）'), empty);
+});
+
+test('/archive refreshes Index.md in the vault after a real push', async () => {
+  const harness = await seeded();
+  const text = harness.command('archive').handler({ rawInput: '' }).text;
+  assert.ok(text.includes('④ ✓ 会话索引（Index.md）'), text);
+
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const index = readFileSync(join(harness.vaultDir, 'dsh-sessions', 'Index.md'), 'utf8');
+  assert.ok(index.includes(shortId(SESSION)), index);
+  assert.ok(index.includes('第一条'), 'title comes from the first user message');
+  // idempotent: a second run rewrites the same content
+  harness.command('archive').handler({ rawInput: '' });
+  assert.equal(readFileSync(join(harness.vaultDir, 'dsh-sessions', 'Index.md'), 'utf8'), index);
 });
