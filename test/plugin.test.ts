@@ -46,7 +46,7 @@ test('disabled by config — or no discoverable vault — mounts nothing', async
   try {
     const unconfigured = makeHarness();
     await unconfigured.apply({ vaultDir: '' });
-    assert.equal(unconfigured.commands.length, 2);
+    assert.equal(unconfigured.commands.length, 3);
     const result = unconfigured.command('obsidian-push').handler({ rawInput: 'all' });
     assert.equal(result.kind, 'error');
     assert.ok(result.text.includes('打开 Obsidian'), result.text);
@@ -66,7 +66,7 @@ test("zero-config: empty vaultDir auto-discovers the vault from Obsidian's regis
   try {
     const harness = makeHarness();
     await harness.apply({ vaultDir: '' });
-    assert.equal(harness.commands.length, 2); // push + /archive, mounted without any hand-typed path
+    assert.equal(harness.commands.length, 3); // push + push-file + /archive, mounted without any hand-typed path
     writeTranscript(harness, '2026-09', [
       { sessionId: 'session-zeroconf01', at: '2026-09-28T01:00:00.000Z', kind: 'user', text: '零配置冒烟' },
       { sessionId: 'session-zeroconf01', at: '2026-09-28T01:05:00.000Z', kind: 'assistant', who: 'deepseek-v4-pro', text: '完成' },
@@ -80,11 +80,11 @@ test("zero-config: empty vaultDir auto-discovers the vault from Obsidian's regis
 });
 test('apply wires the push command and the chain command, each with a hint', async () => {
   const harness = await mounted();
-  assert.deepEqual(harness.commands.map((command) => command.name), ['obsidian-push', 'archive']);
+  assert.deepEqual(harness.commands.map((command) => command.name), ['obsidian-push', 'obsidian-push-file', 'archive']);
   const command = harness.command('obsidian-push');
   assert.match(command.description, /Obsidian/);
   assert.match(command.input?.hint ?? '', /sessionId/);
-  assert.match(harness.command('archive').description, /检查.*推送.*检索/s, '/archive describes all three steps it walks');
+  assert.match(harness.command('archive').description, /检查.*推送.*检索.*索引/s, '/archive describes all four steps it walks');
 });
 
 test('with no archived sidecars the push fails loud pointing at the data dir', async () => {

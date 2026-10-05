@@ -85,3 +85,11 @@ export function decide(existingContent: string | null, planned: PlannedNote): Pu
   }
   return { action: 'write', reason: 'updated' };
 }
+
+/** Single-file push decision (used by /obsidian-push-file): the file goes in
+ * verbatim — no frontmatter, no hash rewriting — so the idempotence check is a
+ * plain content comparison. */
+export function decideFile(existingContent: string | null, content: string): { action: 'skip' | 'write'; reason: string } {
+  if (existingContent !== null && existingContent === content) return { action: 'skip', reason: '内容未变' };
+  return { action: 'write', reason: existingContent === null ? '新建' : '内容有变化，覆盖' };
+}

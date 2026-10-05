@@ -9,10 +9,10 @@ import Schema from '@deepseek-ai/schemastery';
 import type {} from '@deepseek-ai/dsh-commands';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { parseJsonl, type TranscriptLine } from './transcript/line.ts';
-import { planNote, decide, type PushRecordLike } from './push.ts';
+import { planNote, decide, decideFile, type PushRecordLike } from './push.ts';
 import { archiveVerdict, buildIndex, checkArchive, renderSteps, sessionMatches, shortId, type ArchiveCheck, type StepOutcome } from './archive.ts';
 import { parseVaultRegistry, pickVault, registryPaths } from './vault.ts';
 
@@ -157,6 +157,38 @@ export function apply(ctx: Context, config: Config): void {
         kind: 'success',
         text: `推送完成：${result.written} 写入 / ${result.skipped} 跳过（内容未变）。\n${result.details.slice(0, 10).join('\n')}`,
       };
+    },
+  });
+
+  ctx.commands.register({
+    name: 'obsidian-push-file',
+    description: '推送任意 markdown 进 Obsidian 库：/obsidian-push-file <文件路径> [--folder <子目录>]（内容未变自动跳过；deep-scan --save 的报告用它归档）',
+    input: { hint: '<文件路径> [--folder <子目录>]' },
+    handler: ({ rawInput }) => {
+      try {
+        const raw = String(rawInput ?? '').trim().replace(/^["']|["']$/g, '');
+        if (!raw) return { kind: 'error', text: '用法：/obsidian-push-file <文件路径> [--folder <子目录>]' };
+        const folderMatch = /\s--folder\s+(\S+)/.exec(raw);
+        const folder = folderMatch?.[1] ?? config.subfolder;
+        const source = expandHome(raw.replace(/\s--folder\s+\S+/, '').trim());
+        if (!existsSync(source)) return { kind: 'error', text: `文件不存在：${source}` };
+        let content: string;
+        try {
+          content = readFileSync(source, 'utf8');
+        } catch (error) {
+          return { kind: 'error', text: `读不了文件：${String(error)}` };
+        }
+        const vaultDir = resolveVault();
+        if (!vaultDir) return { kind: 'error', text: NO_VAULT_MESSAGE };
+        const target = join(vaultDir, folder, basename(source));
+        const existing = existsSync(target) ? readFileSync(target, 'utf8') : null;
+        const decision = decideFile(existing, content);
+        if (decision.action === 'skip') return { kind: 'success', text: `跳过（${decision.reason}）：${target}` };
+        writeAtomic(target, content);
+        return { kind: 'success', text: `${decision.reason}：${target}` };
+      } catch (error) {
+        return { kind: 'error', text: `/obsidian-push-file 内部出错：${String(error)}` };
+      }
     },
   });
 

@@ -168,3 +168,25 @@ test('/archive refreshes Index.md in the vault after a real push', async () => {
   harness.command('archive').handler({ rawInput: '' });
   assert.equal(readFileSync(join(harness.vaultDir, 'dsh-sessions', 'Index.md'), 'utf8'), index);
 });
+
+test('/obsidian-push-file lands a standalone markdown in the vault, idempotently', async () => {
+  const harness = await mounted();
+  const { writeFileSync, readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const source = join(harness.dataDir, 'report.md');
+  writeFileSync(source, '# 报告\n\n内容', 'utf8');
+
+  const first = harness.command('obsidian-push-file').handler({ rawInput: source }).text;
+  assert.ok(first.includes('新建'), first);
+  const target = join(harness.vaultDir, 'dsh-sessions', 'report.md');
+  assert.equal(readFileSync(target, 'utf8'), '# 报告\n\n内容');
+
+  const again = harness.command('obsidian-push-file').handler({ rawInput: source }).text;
+  assert.ok(again.includes('内容未变'), again);
+
+  // --folder redirects; missing file errors loudly
+  const moved = harness.command('obsidian-push-file').handler({ rawInput: `${source} --folder reports` }).text;
+  assert.ok(moved.includes(join(harness.vaultDir, 'reports', 'report.md')), moved);
+  const missing = harness.command('obsidian-push-file').handler({ rawInput: join(harness.dataDir, 'nope.md') });
+  assert.equal(missing.kind, 'error');
+});
