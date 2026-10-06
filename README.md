@@ -1,5 +1,8 @@
 # dsh-plugin-obsidian-push
 
+> 🧩 **dsh 插件家族**（22 件）：总目录 **[dsh-plugin-family](https://github.com/121212165/dsh-plugin-family)** ｜ 明星插件：**[ide-hub](https://github.com/121212165/dsh-plugin-ide-hub)** 跨 IDE 统一管理 · **[task-forge](https://github.com/121212165/dsh-plugin-task-forge)** 跨窗口无损交接 · **[quota](https://github.com/121212165/dsh-plugin-quota)** 实时用量仪表
+
+
 **EN** · Pushes archived transcripts (from dsh-plugin-transcript) into an Obsidian vault as Markdown with YAML frontmatter, filename `YYYY-MM-DD-<short session id>.md`, deduped by content hash so a re-run skips what has not changed (`/obsidian-push`). and `/archive` walks the whole chain (归档检查 → 推送 → 检索面) in one command. · 21 `node --test` green (incl. YAML quote escaping) · load path shared with sibling plugins that were mounted; this plugin itself not live-mounted.
 
 DeepSeek Harness (dsh) 插件：把归档的会话转录推送成 Obsidian 笔记——YAML frontmatter（title/date/session/tags，Obsidian 属性面板直接可读）、正文按时间排序渲染用户/助手/工具行，按内容哈希幂等去重。数据源是 [dsh-plugin-transcript](https://github.com/121212165/dsh-plugin-transcript) 的 JSONL 边车（同 schema 同默认目录，契约互通）。
