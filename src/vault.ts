@@ -8,7 +8,7 @@ import { join } from 'node:path';
 export interface VaultCandidate {
   path: string;
   open?: boolean;
-  ts?: number;
+  ts?: number | undefined;
 }
 
 /** Pick the best vault from a parsed obsidian.json: open first, then newest. */
