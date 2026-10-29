@@ -1,19 +1,16 @@
 /** Shared assembly-layer harness: a scripted mock dsh context that the real
  * `apply()` wires against, so the /obsidian-push command is exercised over a
- * real temp vault and real temp transcript sidecars — the wire coverage the
- * family audit found missing everywhere. Pattern adopted from dsh-auto-review's
- * mountHarness (222★), rebuilt on node:test after dsh-plugin-task-forge (the
- * family's first port).
+ * real temp vault and real temp transcript sidecars. The mock itself lives in
+ * @dsh-family/kit; this file adds the temp vault layout and sidecar writer.
  *
- * obsidian-push only touches ctx.logger / ctx.commands, so that is all the
- * mock provides. Config here carries no schemastery defaults — tests pass the
- * full shape apply() expects (vaultDir/subfolder/tags/dataDir).
+ * Config here carries no schemastery defaults — tests pass the full shape
+ * apply() expects (vaultDir/subfolder/tags/dataDir).
  * @module test/harness */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { after } from 'node:test';
+
+import { applyOnce, createMockCtx, tempDir } from '@dsh-family/kit/kit/test-harness';
 
 export interface CapturedCommand {
   name: string;
@@ -36,47 +33,36 @@ export interface Harness {
 }
 
 export function makeHarness(): Harness {
-  const commands: CapturedCommand[] = [];
+  const mock = createMockCtx<CapturedCommand, never, never>();
 
-  const ctx = {
-    logger(_name: string) {
-      return { info() {}, warn() {} };
-    },
-    commands: {
-      register(definition: CapturedCommand) {
-        commands.push(definition);
-      },
-    },
-  };
-
-  const vaultDir = mkdtempSync(join(tmpdir(), 'obsidian-push-vault-'));
-  const dataDir = mkdtempSync(join(tmpdir(), 'obsidian-push-data-'));
-  after(() => {
-    rmSync(vaultDir, { recursive: true, force: true });
-    rmSync(dataDir, { recursive: true, force: true });
-  });
+  const vaultDir = tempDir('obsidian-push-vault-');
+  const dataDir = tempDir('obsidian-push-data-');
 
   const config = { enabled: true, vaultDir, subfolder: 'dsh-sessions', tags: ['dsh', 'session'], dataDir };
 
   // apply once per harness — a second call would double-register the command.
-  let applied: Promise<void> | null = null;
+  let pending: Record<string, unknown> = {};
+  let mounted = false;
+  const applied = applyOnce(() =>
+    import('../src/plugin.ts').then(({ apply }) =>
+      apply(mock.ctx as never, { ...config, ...pending } as never),
+    ),
+  );
 
-  const harness: Harness = {
-    commands,
+  return {
+    commands: mock.commands,
     vaultDir,
     dataDir,
     config,
     apply(overrides: Record<string, unknown> = {}) {
-      applied ??= import('../src/plugin.ts').then(({ apply }) => apply(ctx as never, { ...config, ...overrides } as never));
-      return applied;
+      if (!mounted) {
+        mounted = true;
+        pending = overrides;
+      }
+      return applied();
     },
-    command(name: string): CapturedCommand {
-      const found = commands.find((candidate) => candidate.name === name);
-      if (!found) throw new Error(`command ${name} was never registered`);
-      return found;
-    },
+    command: mock.command,
   };
-  return harness;
 }
 
 /** Write one transcript sidecar (the dsh-plugin-transcript JSONL contract)
