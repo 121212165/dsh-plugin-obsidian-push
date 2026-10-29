@@ -32,6 +32,11 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "catalog": {
+      "category": "会话与知识库",
+      "blurb": "转录推送 Obsidian 库：frontmatter + 内容哈希幂等去重，vault 自动发现；`/archive` 一键归档链",
+      "entries": "`/obsidian-push` `/archive`"
     }
   },
   "engines": {
