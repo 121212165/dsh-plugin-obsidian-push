@@ -16,19 +16,19 @@ export interface Config {
     tags: string[];
     dataDir?: string;
 }
-export declare const Config: Schema<Schemastery.ObjectS<{
-    enabled: Schema<boolean, boolean>;
-    vaultDir: Schema<string, string>;
-    subfolder: Schema<string, string>;
-    tags: Schema<string[], string[]>;
-    dataDir: Schema<string, string>;
-}>, Schemastery.ObjectT<{
-    enabled: Schema<boolean, boolean>;
-    vaultDir: Schema<string, string>;
-    subfolder: Schema<string, string>;
-    tags: Schema<string[], string[]>;
-    dataDir: Schema<string, string>;
-}>>;
+export declare const Config: Schema<Schemastery.ObjectS<NoInfer<{
+    enabled: Schema<boolean, boolean, "defined">;
+    vaultDir: Schema<string, string, "defined">;
+    subfolder: Schema<string, string, "defined">;
+    tags: Schema<string[], string[], "defined">;
+    dataDir: Schema<string, string, "plain">;
+}>>, Schemastery.ObjectT<NoInfer<{
+    enabled: Schema<boolean, boolean, "defined">;
+    vaultDir: Schema<string, string, "defined">;
+    subfolder: Schema<string, string, "defined">;
+    tags: Schema<string[], string[], "defined">;
+    dataDir: Schema<string, string, "plain">;
+}>>, "plain">;
 export declare function expandHome(dir: string): string;
 export interface PushResult {
     written: number;
