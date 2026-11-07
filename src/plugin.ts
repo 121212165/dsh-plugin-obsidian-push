@@ -86,7 +86,7 @@ function pushSessions(groups: Map<string, TranscriptLine[]>, argument: string, o
       skipped++;
       continue;
     }
-    writeFileSync(file, planned.content, 'utf8');
+    writeAtomic(file, planned.content);
     written++;
     details.push(`${decision.reason}: ${file}`);
   }
